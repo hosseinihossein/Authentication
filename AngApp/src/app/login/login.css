@@ -1,0 +1,46 @@
+form{
+    border: 1px solid var(--mat-sys-outline-variant);
+    border-radius: 24px;
+    padding: 24px;
+    width: 300px;
+    max-width: 75vw;
+    /*margin: 8px auto;*/
+    box-shadow: 0 5px 5px var(--mat-sys-outline-variant);
+    position: absolute;
+    top: 50vh;
+    left: 50vw;
+    transform: translate(-50%,-50%);
+    overflow: hidden;
+}
+
+mat-form-field{
+    display: block;
+    width: 100%;
+    margin: auto;
+    min-height: 80px;
+}
+
+#login-btn{
+    margin: 0 0 16px 0;
+    display: block;
+    width: 100%;
+    margin: auto;
+}
+
+#signup-btn{
+    float: right;
+    font-size: 12px;
+}
+#forgetPassword-btn{
+    float: left;
+    font-size: 12px;
+}
+
+/*mat-error::before{
+    content: "*";
+}*/
+
+#widget-container{
+    margin: auto;
+    width: fit-content;
+}

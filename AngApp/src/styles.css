@@ -1,0 +1,29 @@
+/* You can add global styles to this file, and also import other style files */
+html{
+    scroll-behavior: smooth;
+}
+.clearfix::after {
+    content: "";
+    clear: both;
+    display: table;
+}
+
+/************ custom scrollbar *************/
+/* Apply to the entire application */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--mat-sys-surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--mat-sys-outline-variant);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--mat-sys-outline);
+}

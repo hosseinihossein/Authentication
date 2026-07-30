@@ -1,0 +1,83 @@
+<form [formRoot]="loginForm">
+    <mat-form-field appearance="fill" subscriptSizing="dynamic">
+        <mat-label>Username or Email</mat-label>
+        <input type="text" matInput [formField]="loginForm.UsernameOrEmail">
+        @if(loginForm.UsernameOrEmail().errors().length > 0){
+        <mat-error>
+            @for(error of loginForm.UsernameOrEmail().errors(); track error.kind){
+            {{error.message}}
+            }
+        </mat-error>
+        }
+    </mat-form-field>
+
+    <mat-form-field appearance="fill" subscriptSizing="dynamic">
+        <mat-label>Password</mat-label>
+        <input type="password" matInput #passwordInput [formField]="loginForm.Password">
+        @if(passwordInput.type === "password"){
+        <mat-icon matSuffix (click)="passwordInput.type='text'">visibility</mat-icon>
+        }
+        @else {
+        <mat-icon matSuffix (click)="passwordInput.type='password'">visibility_off</mat-icon>
+        }
+        @if(loginForm.Password().errors().length > 0){
+        <mat-error>
+            @for(error of loginForm.Password().errors(); track error.kind){
+            {{error.message}}
+            }
+        </mat-error>
+        }
+    </mat-form-field>
+
+    @if(turnstileService.enableTurnstile()){
+    <!--input [formField]="loginForm.CfTurnstileResponse" /-->
+    <div id="widget-container"></div>
+    }
+
+    <div>
+        @if(generalError()){
+        <p style="font-size: 14px;color: var(--mat-sys-error);">{{generalError()}}</p>
+        }
+        @if(loginForm().errors().length > 0 ){
+        <p style="font-size: 14px;color: var(--mat-sys-error);">
+            @for(error of loginForm().errors(); track error.kind){
+            {{error.message}}
+            }
+        </p>
+        }
+        <button matButton="filled" id="login-btn" type="submit" [disabled]="loginForm().invalid()">Login</button>
+    </div>
+
+    <div class="clearfix" style="margin: 8px auto;">
+        <button type="button" matButton id="forgetPassword-btn" (click)="forgetPassword()">Forget password?</button>
+        <a matButton id="signup-btn" [routerLink]="['/Account/Signup']"> Create a new account</a>
+    </div>
+
+    <div style="text-align: center;font-size: 12px;margin: 16px 0;">or</div>
+
+    <div style="margin: auto;display: flex; justify-content: space-evenly;">
+        <button type="submit" form="login-with-github" matFab matTooltip="Login with GitHub">
+            <img priority width="64" height="64" ngSrc="https://img.icons8.com/sf-black-filled/64/github.png"
+                alt="github" />
+        </button>
+        <button type="submit" form="login-with-google" matFab matTooltip="Login with Google">
+            <img priority width="48" height="48" ngSrc="https://img.icons8.com/color/48/google-logo.png"
+                alt="google-logo" />
+        </button>
+    </div>
+
+    @if (displayWait()) {
+    <app-wait-spinner></app-wait-spinner>
+    }
+</form>
+
+<form id="login-with-google" hidden action="/Identity/Api/Authentication/LoginWithGoogle" method="post"
+    enctype="application/x-www-form-urlencoded" (submit)="displayWait.set(true)">
+    <input type="hidden" name="ReturnUrl" [value]="loginForm.ReturnUrl().value()">
+    <button type="submit">Login with Google</button>
+</form>
+<form id="login-with-github" hidden action="/Identity/Api/Authentication/LoginWithGitHub" method="post"
+    enctype="application/x-www-form-urlencoded" (submit)="displayWait.set(true)">
+    <input type="hidden" name="ReturnUrl" [value]="loginForm.ReturnUrl().value()">
+    <button type="submit">Login with GitHub</button>
+</form>
