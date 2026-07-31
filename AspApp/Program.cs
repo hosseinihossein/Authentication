@@ -92,6 +92,8 @@ public class Program
         builder.Services.AddDbContext<Identity_DbContext>(options =>
         {
             options.UseNpgsql(builder.Configuration["ConnectionStrings_Postgres:IdentityConnection"]);
+
+            options.UseOpenIddict<Guid>();
         });
 
         //******************* DataProtection_DbContext *******************
@@ -151,6 +153,12 @@ public class Program
 
         //******************* OpenIddict *******************
         builder.Services.AddOpenIddict()
+        .AddCore(options =>
+        {
+            options.UseEntityFrameworkCore()
+            .UseDbContext<Identity_DbContext>()
+            .ReplaceDefaultEntities<Guid>();
+        })
         .AddClient(options =>
         {
             // Note: this sample uses the code flow, but you can enable the other flows if necessary.
