@@ -20,7 +20,7 @@ export class LoginService {
         loginFormSearchParams.append("Password",loginForm.Password().value());
         loginFormSearchParams.append("ReturnUrl",loginForm.ReturnUrl().value());
 
-        let res = await fetch("Identity/Api/Authentication/Login",{
+        let res = await fetch("Authentication/Api/Login",{
         method: "POST",
         body: loginFormSearchParams,
         /*headers: { // set by default
