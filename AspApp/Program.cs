@@ -279,6 +279,13 @@ public class Program
 
 
 
+        if (builder.Environment.IsDevelopment())
+        {
+            app.UseCors("AllowSpecificOrigin");
+        }
+
+
+
         app.UseHttpsRedirection();
         app.UseStaticFiles(new StaticFileOptions { ServeUnknownFileTypes = true });
         app.UseRouting();
