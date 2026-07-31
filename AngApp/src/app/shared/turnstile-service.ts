@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { afterRenderEffect, effect, inject, Service, signal, WritableSignal } from '@angular/core';
 import { SingletonService } from './singleton-service';
 import { FieldTree } from '@angular/forms/signals';
-import { LoginModel } from '../login/login';
+//import { LoginModel } from '../login/login';
 import { WindowService } from './window-service';
 
 declare const turnstile:any;
@@ -23,7 +23,7 @@ export class TurnstileService {
     }
 
     checkTurnstile(){
-        this.httpClient.get<{enableTurnstile:boolean}>("/Identity/Api/User/EnableTurnstile").subscribe({
+        this.httpClient.get<{enableTurnstile:boolean}>("/Authentication/Api/EnableTurnstile").subscribe({
             next: res => {
                 //console.log(res);
                 if(res && res.enableTurnstile === true){
@@ -36,7 +36,7 @@ export class TurnstileService {
         });
     }
 
-    loadWidget(loginForm:FieldTree<LoginModel>, errorMessageSignal:WritableSignal<string>){
+    loadWidget(myForm:FieldTree<{CfTurnstileResponse: string,}>, errorMessageSignal:WritableSignal<string>){
         this.widgetId.set(
             turnstile.render("#widget-container", {
             sitekey: this.turnstileSiteKey,
@@ -47,7 +47,7 @@ export class TurnstileService {
             "refresh-expired": "manual",
             "refresh-timeout": "manual",
             callback: (token:string) => {
-                loginForm.CfTurnstileResponse().value.set(token);
+                myForm.CfTurnstileResponse().value.set(token);
             },
             'error-callback': (errorCode: string) => {
                 errorMessageSignal.set("Turnstile error! error code: " + errorCode);

@@ -71,12 +71,12 @@
     }
 </form>
 
-<form id="login-with-google" hidden action="/Identity/Api/Authentication/LoginWithGoogle" method="post"
+<form id="login-with-google" hidden action="~/Authentication/Api/LoginWithGoogle" method="post"
     enctype="application/x-www-form-urlencoded" (submit)="displayWait.set(true)">
     <input type="hidden" name="ReturnUrl" [value]="loginForm.ReturnUrl().value()">
     <button type="submit">Login with Google</button>
 </form>
-<form id="login-with-github" hidden action="/Identity/Api/Authentication/LoginWithGitHub" method="post"
+<form id="login-with-github" hidden action="~/Authentication/Api/LoginWithGitHub" method="post"
     enctype="application/x-www-form-urlencoded" (submit)="displayWait.set(true)">
     <input type="hidden" name="ReturnUrl" [value]="loginForm.ReturnUrl().value()">
     <button type="submit">Login with GitHub</button>
