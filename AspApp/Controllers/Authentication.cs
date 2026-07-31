@@ -40,6 +40,14 @@ public class AuthenticationController : ControllerBase
 
 
 
+    [HttpGet]
+    public IActionResult EnableTurnstile([FromServices] IConfiguration configuration)
+    {
+        return Ok(new { enableTurnstile = configuration.GetValue<bool>("TurnsTileEnable", false) });
+    }
+
+
+
     [HttpPost]
     public async Task<IActionResult> Login([FromForm] Authentication_Login_FormModel formModel,
     [FromServices] IConfiguration configuration, [FromServices] TurnstileService turnstileService)
