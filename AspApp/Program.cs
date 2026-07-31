@@ -94,6 +94,12 @@ public class Program
             options.UseNpgsql(builder.Configuration["ConnectionStrings_Postgres:IdentityConnection"]);
         });
 
+        //******************* DataProtection_DbContext *******************
+        builder.Services.AddDbContext<DataProtection_DbContext>(options =>
+        {
+            options.UseNpgsql(builder.Configuration["ConnectionStrings_Postgres:DataProtectionConnection"]);
+        });
+
 
 
         //******************* Identity service *******************
@@ -311,6 +317,9 @@ public class Program
         //**************************** Seed Data **************************
         await using (var scope = app.Services.CreateAsyncScope())
         {
+            var dataProtectionDb = scope.ServiceProvider.GetRequiredService<DataProtection_DbContext>();
+            await dataProtectionDb.Database.MigrateAsync();
+
             var identityDb = scope.ServiceProvider.GetRequiredService<Identity_DbContext>();
             await identityDb.Database.MigrateAsync();
 
