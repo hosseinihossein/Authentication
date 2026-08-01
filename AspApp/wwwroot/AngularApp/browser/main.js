@@ -60533,6 +60533,17 @@ var Login = class _Login {
 
 // src/app/app.routes.ts
 var routes = [
+  {
+    path: "Authorization/Api/Authorize",
+    redirectTo: (activatedRouteSnapshot) => {
+      let url = new URL("https://localhost:5443/Authorization/Api/Authorize");
+      for (let key of activatedRouteSnapshot.queryParamMap.keys) {
+        url.searchParams.append(key, activatedRouteSnapshot.queryParamMap.get(key));
+      }
+      window.location.href = url.toString();
+      return "";
+    }
+  },
   { path: "", component: Login }
 ];
 
@@ -61337,5 +61348,5 @@ var App = class _App {
 
 // src/main.ts
 bootstrapApplication(App, appConfig).catch((err) => console.error(err));
-//# debugId=2b2b8bf5-68ba-56d8-bdd8-828f540b475d
+//# debugId=d8bbc7df-a5d1-592e-bc6a-bfe72ebe2a13
 //# sourceMappingURL=main.js.map
