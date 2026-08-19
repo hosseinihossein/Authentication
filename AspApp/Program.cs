@@ -4,6 +4,7 @@ using System.Security.Cryptography.X509Certificates;
 using AspApp.Helpers;
 using AspApp.Models;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
@@ -161,7 +162,8 @@ public class Program
         //******************* Kestrel *******************
         builder.WebHost.ConfigureKestrel(options =>
         {
-            options.Listen(IPAddress.Any, builder.Configuration.GetValue<int>("TcpPort"), listenOptions =>
+            options.Listen(IPAddress.Any, 80);
+            /*builder.Configuration.GetValue<int>("TcpPort"), listenOptions =>
             {
                 string pemFilePath = Path.Combine(certsDirPath, "HoLibz.com.pem");
                 string keyFilePath = Path.Combine(certsDirPath, "HoLibz.com.key");
@@ -174,7 +176,7 @@ public class Program
                 {
                     listenOptions.UseHttps();
                 }
-            });
+            });*/
 
             options.Limits.MaxRequestBodySize = 16 * 1024;// 16 KB
         });
@@ -286,20 +288,20 @@ public class Program
             {
                 options.SetClientId(builder.Configuration["GitHubClientId"]!)
                 .SetClientSecret(builder.Configuration["GitHubClientSecret"]!)
-                .SetRedirectUri("Authentication/Api/GitHubLoginCallback");
+                .SetRedirectUri("Api/Authentication/GitHubLoginCallback");
             })
             .AddGoogle(options =>
             {
                 options.SetClientId(builder.Configuration["GoogleClientId"]!)
                 .SetClientSecret(builder.Configuration["GoogleClientSecret"]!)
-                .SetRedirectUri("Authentication/Api/GoogleLoginCallback");
+                .SetRedirectUri("Api/Authentication/GoogleLoginCallback");
             });
-        })
-        .AddValidation(options =>
+        });
+        /*.AddValidation(options =>
         {
             // Note: the validation handler uses OpenID Connect discovery
             // to retrieve the issuer signing keys used to validate tokens.
-            options.SetIssuer(builder.Configuration["OidcIssuer"] ?? "https://localhost:5443/");
+            options.SetIssuer(builder.Configuration["OidcIssuer"] ?? "http://My_Authorization/");
 
             // Register the encryption credentials. This sample uses a symmetric
             // encryption key that is shared between the server and the API project.
@@ -307,7 +309,7 @@ public class Program
             // Note: in a real world application, this encryption key should be
             // stored in a safe place (e.g in Azure KeyVault, stored as a secret).
             options.AddEncryptionKey(new SymmetricSecurityKey(
-                Convert.FromBase64String("DRjd/GnduI3Efzen9V9BvbNUfc/VKgXltV7Kbk9sMkY="))
+                Convert.FromBase64String(builder.Configuration["OidcServerEncryptionKey"]!))
             );
 
             // Register the System.Net.Http integration.
@@ -315,7 +317,7 @@ public class Program
 
             // Register the ASP.NET Core host.
             options.UseAspNetCore();
-        });
+        });*/
 
 
 
@@ -330,7 +332,7 @@ public class Program
         //******************* ControllersWithViews *******************
         builder.Services.AddControllersWithViews(options =>
         {
-            options.Filters.Add(new RequireHttpsAttribute());
+            //options.Filters.Add(new RequireHttpsAttribute());
         });
 
 
@@ -351,11 +353,11 @@ public class Program
 
         //**************************** Custom Services **************************
         builder.Services.AddSingleton<TurnstileService>();
-        builder.Services.AddSingleton<FileExtensionContentTypeProvider>();
+        //builder.Services.AddSingleton<FileExtensionContentTypeProvider>();
 
 
 
-        if (builder.Environment.IsDevelopment())
+        /*if (builder.Environment.IsDevelopment())
         {
             builder.Services.AddCors(options =>
             {
@@ -366,7 +368,7 @@ public class Program
                     .AllowAnyMethod();
                 });
             });
-        }
+        }*/
 
 
 
@@ -374,15 +376,22 @@ public class Program
 
 
 
-        if (builder.Environment.IsDevelopment())
+        /*if (builder.Environment.IsDevelopment())
         {
             app.UseCors("AllowSpecificOrigin");
-        }
+        }*/
 
 
 
-        app.UseHttpsRedirection();
-        app.UseStaticFiles(new StaticFileOptions { ServeUnknownFileTypes = true });
+        app.UseForwardedHeaders(new ForwardedHeadersOptions
+        {
+            ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+        });
+
+
+
+        //app.UseHttpsRedirection();
+        //app.UseStaticFiles(new StaticFileOptions { ServeUnknownFileTypes = true });
         app.UseRouting();
 
         app.UseAuthentication();
@@ -391,7 +400,7 @@ public class Program
         app.MapControllers();
         app.MapDefaultControllerRoute();
 
-        app.Map("/{*catchAll}", async (HttpContext context, FileExtensionContentTypeProvider provider) =>
+        /*app.Map("/{*catchAll}", async (HttpContext context, FileExtensionContentTypeProvider provider) =>
         {
             string? catchAll = context.Request.RouteValues["catchAll"]?.ToString();
             if (!string.IsNullOrWhiteSpace(catchAll))
@@ -420,7 +429,7 @@ public class Program
             await context.Response.SendFileAsync(
                 Path.Combine(app.Environment.WebRootPath, "AngularApp", "browser", "index.html")
             );
-        });
+        });*/
 
 
 
@@ -472,7 +481,8 @@ public class Program
 
 
         //******************* app.Run ******************
-        Console.WriteLine($"\n*** Authentication App is running on all network interfaces on port '{builder.Configuration["TcpPort"]}'");
+        //Console.WriteLine($"\n*** Authentication App is running on all network interfaces on port '{builder.Configuration["TcpPort"]}'");
+        Console.WriteLine($"\n*** Authentication App is running on all network interfaces on port '80'");
         app.Run();
     }
 }

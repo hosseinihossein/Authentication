@@ -14,7 +14,7 @@ using static OpenIddict.Abstractions.OpenIddictConstants;
 namespace AspApp.Controllers;
 
 [ApiController]
-[Route("[controller]/Api/[action]")]
+[Route("Api/[controller]/[action]")]
 public class AuthenticationController : ControllerBase
 {
     private readonly SignInManager<Identity_UserDbModel> _signInManager;
@@ -238,7 +238,7 @@ public class AuthenticationController : ControllerBase
         var exSigninResult = await _signInManager.ExternalLoginSignInAsync(loginProvider, providerKey, true);
         //Console.WriteLine($"***** exSigninResult: {exSigninResult}");
 
-        return LocalRedirect(result.Properties.RedirectUri ?? "/");
+        return Redirect(result.Properties.RedirectUri ?? "/Api/Authorization/Authorize");
     }
 
 
@@ -311,7 +311,7 @@ public class AuthenticationController : ControllerBase
         var exSigninResult = await _signInManager.ExternalLoginSignInAsync(loginProvider, providerKey, true);
         //Console.WriteLine($"exSigninResult: {JsonSerializer.Serialize(exSigninResult)}");
 
-        return LocalRedirect(result.Properties.RedirectUri ?? "/");
+        return Redirect(result.Properties.RedirectUri ?? "/Api/Authorization/Authorize");
     }
 
 

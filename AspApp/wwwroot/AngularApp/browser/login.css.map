@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["src/app/login/login.css"],
-  "sourcesContent": ["form{\r\n    border: 1px solid var(--mat-sys-outline-variant);\r\n    border-radius: 24px;\r\n    padding: 24px;\r\n    width: 300px;\r\n    max-width: 75vw;\r\n    /*margin: 8px auto;*/\r\n    box-shadow: 0 5px 5px var(--mat-sys-outline-variant);\r\n    position: absolute;\r\n    top: 50vh;\r\n    left: 50vw;\r\n    transform: translate(-50%,-50%);\r\n    overflow: hidden;\r\n}\r\n\r\nmat-form-field{\r\n    display: block;\r\n    width: 100%;\r\n    margin: auto;\r\n    min-height: 80px;\r\n}\r\n\r\n#login-btn{\r\n    margin: 0 0 16px 0;\r\n    display: block;\r\n    width: 100%;\r\n    margin: auto;\r\n}\r\n\r\n#signup-btn{\r\n    float: right;\r\n    font-size: 12px;\r\n}\r\n#forgetPassword-btn{\r\n    float: left;\r\n    font-size: 12px;\r\n}\r\n\r\n/*mat-error::before{\r\n    content: \"*\";\r\n}*/\r\n\r\n#widget-container{\r\n    margin: auto;\r\n    width: fit-content;\r\n}\r\n"],
-  "mappings": ";AAAA;AACI,UAAQ,IAAI,MAAM,IAAI;AACtB,iBAAe;AACf,WAAS;AACT,SAAO;AACP,aAAW;AAEX,cAAY,EAAE,IAAI,IAAI,IAAI;AAC1B,YAAU;AACV,OAAK;AACL,QAAM;AACN,aAAW,UAAU,IAAI,EAAC;AAC1B,YAAU;AACd;AAEA;AACI,WAAS;AACT,SAAO;AACP,UAAQ;AACR,cAAY;AAChB;AAEA,CAAC;AACG,UAAQ,EAAE,EAAE,KAAK;AACjB,WAAS;AACT,SAAO;AACP,UAAQ;AACZ;AAEA,CAAC;AACG,SAAO;AACP,aAAW;AACf;AACA,CAAC;AACG,SAAO;AACP,aAAW;AACf;AAMA,CAAC;AACG,UAAQ;AACR,SAAO;AACX;",
-  "names": []
-}
