@@ -385,7 +385,8 @@ public class Program
 
         app.UseForwardedHeaders(new ForwardedHeadersOptions
         {
-            ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+            ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+            KnownIPNetworks = {new System.Net.IPNetwork(IPAddress.Parse("172.18.0.0"),16)}
         });
 
 
