@@ -163,21 +163,6 @@ public class Program
         builder.WebHost.ConfigureKestrel(options =>
         {
             options.Listen(IPAddress.Any, 80);
-            /*builder.Configuration.GetValue<int>("TcpPort"), listenOptions =>
-            {
-                string pemFilePath = Path.Combine(certsDirPath, "HoLibz.com.pem");
-                string keyFilePath = Path.Combine(certsDirPath, "HoLibz.com.key");
-                if (System.IO.File.Exists(pemFilePath) && System.IO.File.Exists(keyFilePath))
-                {
-                    X509Certificate2 x509Certificate2 = X509Certificate2.CreateFromPemFile(pemFilePath, keyFilePath);
-                    listenOptions.UseHttps(x509Certificate2);
-                }
-                else
-                {
-                    listenOptions.UseHttps();
-                }
-            });*/
-
             options.Limits.MaxRequestBodySize = 16 * 1024;// 16 KB
         });
 
@@ -297,27 +282,6 @@ public class Program
                 .SetRedirectUri("Api/Authentication/GoogleLoginCallback");
             });
         });
-        /*.AddValidation(options =>
-        {
-            // Note: the validation handler uses OpenID Connect discovery
-            // to retrieve the issuer signing keys used to validate tokens.
-            options.SetIssuer(builder.Configuration["OidcIssuer"] ?? "http://My_Authorization/");
-
-            // Register the encryption credentials. This sample uses a symmetric
-            // encryption key that is shared between the server and the API project.
-            //
-            // Note: in a real world application, this encryption key should be
-            // stored in a safe place (e.g in Azure KeyVault, stored as a secret).
-            options.AddEncryptionKey(new SymmetricSecurityKey(
-                Convert.FromBase64String(builder.Configuration["OidcServerEncryptionKey"]!))
-            );
-
-            // Register the System.Net.Http integration.
-            options.UseSystemNetHttp();
-
-            // Register the ASP.NET Core host.
-            options.UseAspNetCore();
-        });*/
 
 
 
@@ -330,10 +294,7 @@ public class Program
 
 
         //******************* ControllersWithViews *******************
-        builder.Services.AddControllersWithViews(options =>
-        {
-            //options.Filters.Add(new RequireHttpsAttribute());
-        });
+        builder.Services.AddControllersWithViews();
 
 
 
@@ -353,22 +314,6 @@ public class Program
 
         //**************************** Custom Services **************************
         builder.Services.AddSingleton<TurnstileService>();
-        //builder.Services.AddSingleton<FileExtensionContentTypeProvider>();
-
-
-
-        /*if (builder.Environment.IsDevelopment())
-        {
-            builder.Services.AddCors(options =>
-            {
-                options.AddPolicy("AllowSpecificOrigin", policy =>
-                {
-                    policy.WithOrigins("https://localhost:5443", "https://localhost:5445")
-                    .AllowAnyHeader()
-                    .AllowAnyMethod();
-                });
-            });
-        }*/
 
 
 
@@ -376,23 +321,14 @@ public class Program
 
 
 
-        /*if (builder.Environment.IsDevelopment())
-        {
-            app.UseCors("AllowSpecificOrigin");
-        }*/
-
-
-
         app.UseForwardedHeaders(new ForwardedHeadersOptions
         {
             ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
-            KnownIPNetworks = {new System.Net.IPNetwork(IPAddress.Parse("172.18.0.0"),16)}
+            KnownIPNetworks = { new System.Net.IPNetwork(IPAddress.Parse("172.18.0.0"), 16) }
         });
 
 
 
-        //app.UseHttpsRedirection();
-        //app.UseStaticFiles(new StaticFileOptions { ServeUnknownFileTypes = true });
         app.UseRouting();
 
         app.UseAuthentication();
@@ -400,37 +336,6 @@ public class Program
 
         app.MapControllers();
         app.MapDefaultControllerRoute();
-
-        /*app.Map("/{*catchAll}", async (HttpContext context, FileExtensionContentTypeProvider provider) =>
-        {
-            string? catchAll = context.Request.RouteValues["catchAll"]?.ToString();
-            if (!string.IsNullOrWhiteSpace(catchAll))
-            {
-                string staticFilePath =
-                Path.Combine(app.Environment.WebRootPath, "AngularApp", "browser", catchAll);
-                if (File.Exists(staticFilePath))
-                {
-                    //var provider = new FileExtensionContentTypeProvider();
-                    if (provider.TryGetContentType(staticFilePath, out string? contentType))
-                    {
-                        context.Response.ContentType = contentType;
-                        await context.Response.SendFileAsync(staticFilePath);
-                        return;
-                    }
-                    else
-                    {
-                        context.Response.ContentType = "application/octet-stream";
-                        await context.Response.SendFileAsync(staticFilePath);
-                        return;
-                    }
-                }
-            }
-
-            context.Response.ContentType = "text/html";
-            await context.Response.SendFileAsync(
-                Path.Combine(app.Environment.WebRootPath, "AngularApp", "browser", "index.html")
-            );
-        });*/
 
 
 
@@ -482,8 +387,7 @@ public class Program
 
 
         //******************* app.Run ******************
-        //Console.WriteLine($"\n*** Authentication App is running on all network interfaces on port '{builder.Configuration["TcpPort"]}'");
-        Console.WriteLine($"\n*** Authentication App is running on all network interfaces on port '80'");
+        Console.WriteLine($"\n*** App is running on all network port '80'");
         app.Run();
     }
 }
