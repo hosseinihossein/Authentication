@@ -20,144 +20,6 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
 
-        //******************* Certificates *******************
-        string certsDirPath = Path.Combine(builder.Environment.ContentRootPath, "Certs");
-        Directory.CreateDirectory(certsDirPath);
-
-        // OIDC Client signing
-        string clientSigningCertPath = Path.Combine(certsDirPath, "oidc-client-signing-certificate.pfx");
-        X509Certificate2 clientSigningCert;
-        if (File.Exists(clientSigningCertPath))
-        {
-            clientSigningCert = X509CertificateLoader.LoadPkcs12FromFile(clientSigningCertPath, string.Empty);
-        }
-        /*else
-        {
-            using var algorithm = RSA.Create(keySizeInBits: 4096);
-
-            var subject = new X500DistinguishedName("CN=OIDC Client Signing Certificate");
-            var request = new CertificateRequest(subject, algorithm, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-            request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, critical: true));
-
-            clientSigningCert = request.CreateSelfSigned(DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddYears(2));
-
-            await File.WriteAllBytesAsync(clientSigningCertPath, clientSigningCert.Export(X509ContentType.Pfx, string.Empty));
-        }*/
-        else
-        {
-            // 1. Create an ECDSA key pair
-            using ECDsa ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-
-            // 2. Define certificate subject
-            var subject = new X500DistinguishedName("CN=OIDC Client Signing Certificate");
-
-            // 3. Create certificate request
-            var request = new CertificateRequest(
-                subject,
-                ecdsa,
-                HashAlgorithmName.SHA256
-            );
-
-            // Optional: Add extensions
-            request.CertificateExtensions.Add(
-                new X509BasicConstraintsExtension(false, false, 0, false)
-            );
-            request.CertificateExtensions.Add(
-                new X509KeyUsageExtension(
-                    X509KeyUsageFlags.DigitalSignature,// | X509KeyUsageFlags.KeyEncipherment,
-                    critical: true
-                )
-            );
-            request.CertificateExtensions.Add(
-                new X509SubjectKeyIdentifierExtension(request.PublicKey, false)
-            );
-
-            // 4. Create the self-signed certificate (valid for 1 year)
-            clientSigningCert = request.CreateSelfSigned(
-                DateTimeOffset.UtcNow.AddDays(-1),
-                DateTimeOffset.UtcNow.AddYears(1)
-            );
-
-            await File.WriteAllBytesAsync(clientSigningCertPath, clientSigningCert.Export(X509ContentType.Pfx, string.Empty));
-
-        }
-
-        // OIDC Client encryption
-        string clientEncryptionCertPath = Path.Combine(certsDirPath, "oidc-client-encryption-certificate.pfx");
-        X509Certificate2 clientEncryptionCert;
-        if (File.Exists(clientEncryptionCertPath))
-        {
-            clientEncryptionCert = X509CertificateLoader.LoadPkcs12FromFile(clientEncryptionCertPath, string.Empty);
-        }
-        /*else
-        {
-            using var algorithm = RSA.Create(keySizeInBits: 4096);
-
-            var subject = new X500DistinguishedName("CN=OIDC Client Encryption Certificate");
-            var request = new CertificateRequest(subject, algorithm, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-            request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.KeyEncipherment, critical: true));
-
-            clientEncryptionCert = request.CreateSelfSigned(DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddYears(2));
-
-            await File.WriteAllBytesAsync(clientEncryptionCertPath, clientEncryptionCert.Export(X509ContentType.Pfx, string.Empty));
-        }*/
-        else
-        {
-            // 1. Create an ECDSA key pair
-            using ECDsa ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-
-            // 2. Define certificate subject
-            var subject = new X500DistinguishedName("CN=OIDC Client Encryption Certificate");
-
-            // 3. Create certificate request
-            var request = new CertificateRequest(
-                subject,
-                ecdsa,
-                HashAlgorithmName.SHA256
-            );
-
-            // Optional: Add extensions
-            request.CertificateExtensions.Add(
-                new X509BasicConstraintsExtension(false, false, 0, false)
-            );
-            request.CertificateExtensions.Add(
-                new X509KeyUsageExtension(
-                    /*X509KeyUsageFlags.DigitalSignature, |*/ X509KeyUsageFlags.KeyEncipherment,
-                    critical: true
-                )
-            );
-            request.CertificateExtensions.Add(
-                new X509SubjectKeyIdentifierExtension(request.PublicKey, false)
-            );
-
-            // 4. Create the self-signed certificate (valid for 1 year)
-            clientEncryptionCert = request.CreateSelfSigned(
-                DateTimeOffset.UtcNow.AddDays(-1),
-                DateTimeOffset.UtcNow.AddYears(1)
-            );
-
-            await File.WriteAllBytesAsync(clientEncryptionCertPath, clientEncryptionCert.Export(X509ContentType.Pfx, string.Empty));
-
-            /*/ 3. Extract ECDSA private key from certificate
-            var ecdsaPrivateKey = clientEncryptionCert.GetECDsaPrivateKey();
-
-            // 4. Create a SecurityKey from the ECDSA private key
-            var securityKey = new ECDsaSecurityKey(ecdsaPrivateKey);
-            //{
-            //    KeyId = Guid.NewGuid().ToString() // Optional: set a KeyId
-            //};
-
-            // 5. Explicitly specify SigningCredentials
-            clientEncryptionCredentials = new SigningCredentials(
-                securityKey,
-                SecurityAlgorithms.EcdsaSha256 // Algorithm must match key type
-            );*/
-
-            //new X509EncryptingCredentials(clientEncryptionCert);
-
-        }
-
-
 
         //******************* Kestrel *******************
         builder.WebHost.ConfigureKestrel(options =>
@@ -230,6 +92,18 @@ public class Program
         .SetApplicationName("SharedIdentityApp"); // Must match across all servers
 
 
+        
+
+        
+
+        // OIDC Client encryption
+        using var algorithm = RSA.Create(keySizeInBits: 4096);
+
+        var subject = new X500DistinguishedName("CN=OIDC Client Encryption Certificate");
+        var request = new CertificateRequest(subject, algorithm, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.KeyEncipherment, critical: true));
+
+        var clientEncryptionCert = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(2));
 
         //******************* OpenIddict *******************
         builder.Services.AddOpenIddict()
@@ -245,11 +119,12 @@ public class Program
             options.AllowAuthorizationCodeFlow();
 
             // Register the signing and encryption credentials used to protect
-            // sensitive data like the state tokens produced by OpenIddict.
-            //options.AddEncryptionCertificate(clientEncryptionCert)
-            //.AddSigningCertificate(clientSigningCert);
-            options.AddEncryptionCredentials(new X509EncryptingCredentials(clientEncryptionCert))
-            .AddSigningCredentials(new X509SigningCredentials(clientSigningCert));
+            // sensitive data like the state tokens produced by OpenIddict.            
+            options.AddEncryptionCertificate(clientEncryptionCert)
+            .AddSigningCredentials(new SigningCredentials(
+                new ECDsaSecurityKey(ECDsa.Create(ECCurve.NamedCurves.nistP256)),
+                SecurityAlgorithms.EcdsaSha256
+            ));
 
             // Register the ASP.NET Core host and configure the ASP.NET Core-specific options.
             options.UseAspNetCore()
