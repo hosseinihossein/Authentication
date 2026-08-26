@@ -1,11 +1,13 @@
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Web;
 using AspApp.Helpers;
 using AspApp.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.TagHelpers;
 using OpenIddict.Abstractions;
 using OpenIddict.Client.AspNetCore;
 using OpenIddict.Client.WebIntegration;
@@ -115,7 +117,7 @@ public class AuthenticationController : ControllerBase
         var properties = new AuthenticationProperties
         {
             // Only allow local return URLs to prevent open redirect attacks.(I don't know about this)
-            RedirectUri = formModel.ReturnUrl ?? "/"
+            RedirectUri = formModel.ReturnUrl ?? "/",
         };
         properties.SetParameter("scope", _gitHubScopes);
 
@@ -143,7 +145,37 @@ public class AuthenticationController : ControllerBase
     [HttpGet, HttpPost, IgnoreAntiforgeryToken]
     public async Task<ActionResult> GitHubLoginCallback()
     {
+        /*if (Request.Query.Keys.Contains("iss"))
+        {
+            var queryDict = HttpUtility.ParseQueryString(Request.QueryString.Value ?? "");
+            queryDict.Remove("iss");
+
+            IEnumerable<KeyValuePair<string,string?>> keyValuePairs = [];
+            foreach(string k in queryDict.Keys)
+            {
+                keyValuePairs = keyValuePairs.Append(new KeyValuePair<string, string?>(k, queryDict[k]));
+            }
+
+            string myUrl = Request.PathBase + Request.Path +
+            QueryString.Create(keyValuePairs);
+
+            Console.WriteLine("\n***** myUrl = " + myUrl);
+
+            return LocalRedirect(myUrl);
+        }*/
+
         var result = await HttpContext.AuthenticateAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme);
+
+        /*Console.WriteLine("\n ***** result.Failure?.Message = "+result.Failure?.Message);
+        Console.WriteLine("\n ***** result.None = "+result.None);
+        Console.WriteLine("\n ***** result.Succeeded = "+result.Succeeded);
+        Console.WriteLine("\n ***** result.Principal?.Identity?.IsAuthenticated = "+result.Principal?.Identity?.IsAuthenticated);
+        Console.WriteLine("\n ***** result.Principal?.GetClaim(ClaimTypes.NameIdentifier) = "+result.Principal?.GetClaim(ClaimTypes.NameIdentifier));
+        Console.WriteLine("\n ***** claims:");
+        foreach (var claim in result.Principal?.Claims ?? [])
+        {
+            Console.WriteLine(claim.Type + " = " + claim.Value);
+        }*/
 
         if (result is not { Succeeded: true, Principal.Identity.IsAuthenticated: true })
         {

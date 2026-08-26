@@ -10,6 +10,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using OpenIddict.Abstractions;
+using OpenIddict.Client;
+using OpenIddict.Client.WebIntegration;
 
 namespace AspApp;
 
@@ -144,18 +147,59 @@ public class Program
             // parameter containing their URL as part of authorization responses. For more information,
             // see https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics#section-4.4.
             options.UseWebProviders()
-            .AddGitHub(options =>
+            .AddGitHub(opts =>
             {
-                options.SetClientId(builder.Configuration["GitHubClientId"]!)
+                opts.SetClientId(builder.Configuration["GitHubClientId"]!)
                 .SetClientSecret(builder.Configuration["GitHubClientSecret"]!)
                 .SetRedirectUri("Api/Authentication/GitHubLoginCallback");
             })
-            .AddGoogle(options =>
+            .AddGoogle(opts =>
             {
-                options.SetClientId(builder.Configuration["GoogleClientId"]!)
+                opts.SetClientId(builder.Configuration["GoogleClientId"]!)
                 .SetClientSecret(builder.Configuration["GoogleClientSecret"]!)
                 .SetRedirectUri("Api/Authentication/GoogleLoginCallback");
             });
+
+            /*options.AddEventHandler<OpenIddictClientEvents.PrepareConfigurationRequestContext>(b =>
+            {
+                b.UseInlineHandler(cntx =>
+                {
+                    cntx.Configuration.AuthorizationResponseIssParameterSupported = true;
+                    return ValueTask.CompletedTask;
+                });
+            });*/
+
+            options.RemoveEventHandler(OpenIddictClientHandlers.ValidateIssuerParameter.Descriptor);
+
+            /*options.AddRegistration(new OpenIddictClientRegistration
+            {
+                ProviderName = "GitHub_Provider",
+                Issuer = new Uri("https://github.com/login/oauth",UriKind.Absolute),
+                ClientId = builder.Configuration["GitHubClientId"],
+                ClientSecret = builder.Configuration["GitHubClientSecret"],
+                RedirectUri = new Uri("Api/Authentication/GitHubLoginCallback", UriKind.Relative),
+
+                Scopes = {OpenIddictConstants.Scopes.OpenId, "read:user", "user:email"},
+
+                Configuration = new OpenIddictConfiguration
+                {
+                    AuthorizationResponseIssParameterSupported = true,
+                    Issuer = new Uri("https://github.com/login/oauth",UriKind.Absolute),
+                    AuthorizationEndpoint = new Uri("https://github.com/login/oauth/authorize",UriKind.Absolute),
+                    TokenEndpoint = new Uri("https://github.com/login/oauth/access_token",UriKind.Absolute),
+                    JsonWebKeySetUri = new Uri("https://github.com/login/oauth/.well-known/jwks",UriKind.Absolute),
+
+                    ResponseTypesSupported = { OpenIddictConstants.ResponseTypes.Code},
+                    ResponseModesSupported = {OpenIddictConstants.ResponseModes.Query},
+                    GrantTypesSupported = {OpenIddictConstants.GrantTypes.AuthorizationCode},
+
+                    TokenEndpointAuthMethodsSupported = 
+                    {
+                        //OpenIddictConstants.ClientAuthenticationMethods.ClientSecretBasic,
+                        OpenIddictConstants.ClientAuthenticationMethods.ClientSecretPost,
+                    }
+                }
+            });*/
         });
 
 
