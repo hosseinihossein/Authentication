@@ -18,12 +18,12 @@ class DataProtection_DbContext : DbContext, IDataProtectionKeyContext
 }
 
 //*********************************** Identity_DbContext ************************************
-public class Identity_DbContext : IdentityDbContext<Identity_UserDbModel, Identity_RoleDbModel, Guid>
+public class Identity_DbContext : IdentityDbContext<IdentityUser<Guid>, IdentityRole<Guid>, Guid>
 {
     public Identity_DbContext(DbContextOptions<Identity_DbContext> options) : base(options) { }
 }
 
-public class Identity_UserDbModel : IdentityUser<Guid>
+/*public class Identity_UserDbModel : IdentityUser<Guid>
 {
     [MaxLength(128)]
     public string? DisplayName { get; set; }
@@ -49,4 +49,4 @@ public class Identity_RoleDbModel : IdentityRole<Guid>
     public Identity_RoleDbModel(string roleName) : base(roleName) { }
     [MaxLength(128)]
     public string Description { get; set; } = string.Empty;
-}
+}*/

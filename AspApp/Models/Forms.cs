@@ -6,10 +6,10 @@ public class Authentication_Login_FormModel
 {
     public string? ReturnUrl { get; set; }
 
-    [StringLength(256)]
+    [StringLength(128, MinimumLength = 3)]
     public string UsernameOrEmail { get; set; } = string.Empty;
 
-    [StringLength(256, MinimumLength = 5)]
+    [StringLength(60, MinimumLength = 8)]
     public string Password { get; set; } = string.Empty;
 
     [StringLength(2048)]

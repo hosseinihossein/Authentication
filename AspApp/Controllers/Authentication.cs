@@ -8,6 +8,8 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.TagHelpers;
+using MongoDB.Bson;
+using MongoDB.Driver;
 using OpenIddict.Abstractions;
 using OpenIddict.Client.AspNetCore;
 using OpenIddict.Client.WebIntegration;
@@ -16,12 +18,15 @@ using static OpenIddict.Abstractions.OpenIddictConstants;
 namespace AspApp.Controllers;
 
 [ApiController]
-[Route("Api/[controller]/[action]")]
+[Route("api/identity/[controller]/[action]")]
 public class AuthenticationController : ControllerBase
 {
-    private readonly SignInManager<Identity_UserDbModel> _signInManager;
-    private readonly UserManager<Identity_UserDbModel> _userManager;
+    private readonly SignInManager<IdentityUser<Guid>> _signInManager;
+    private readonly UserManager<IdentityUser<Guid>> _userManager;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly UsernameGenerator _usernameGenerator;
+    private readonly IMongoCollection<BsonDocument> _userProfileCollection;
+    private readonly KafkaEmailSender _emailSender;
 
     private readonly string[] _googleScopeEmail = [Scopes.Email];//[Scopes.OpenId, Scopes.Email, Scopes.Profile];
     //private readonly string[] _googleScopeProfile = [Scopes.Profile];//[Scopes.OpenId, Scopes.Email, Scopes.Profile];
@@ -30,14 +35,21 @@ public class AuthenticationController : ControllerBase
 
 
     public AuthenticationController(
-        SignInManager<Identity_UserDbModel> signInManager,
-        UserManager<Identity_UserDbModel> userManager,
-        IHttpClientFactory httpClientFactory
+        SignInManager<IdentityUser<Guid>> signInManager,
+        UserManager<IdentityUser<Guid>> userManager,
+        IHttpClientFactory httpClientFactory,
+        UsernameGenerator usernameGenerator,
+        IMongoDatabase mongoUserDb,
+        IConfiguration configuration,
+        KafkaEmailSender emailSender
     )
     {
         _signInManager = signInManager;
         _userManager = userManager;
         _httpClientFactory = httpClientFactory;
+        _usernameGenerator = usernameGenerator;
+        _userProfileCollection = mongoUserDb.GetCollection<BsonDocument>(configuration["MongoDB:ProfileCollectionName"] ?? "Profile");
+        _emailSender = emailSender;
     }
 
 
@@ -51,34 +63,14 @@ public class AuthenticationController : ControllerBase
 
 
     [HttpPost]
-    public async Task<IActionResult> Login([FromForm] Authentication_Login_FormModel formModel,
-    [FromServices] IConfiguration configuration, [FromServices] TurnstileService turnstileService)
+    [ValidateTurnstile]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Login([FromForm] Authentication_Login_FormModel formModel)
+    //[FromServices] IConfiguration configuration, [FromServices] TurnstileService turnstileService)
     {
         if (ModelState.IsValid)
         {
-            if (configuration.GetValue<bool>("TurnsTileEnable", false))
-            {
-                if (formModel.CfTurnstileResponse == null)
-                {
-                    ModelState.AddModelError("Turnstile", "CfTurnstileResponse can not be null!");
-                    return BadRequest(ModelState);
-                }
-                var remoteip = HttpContext.Request.Headers["CF-Connecting-IP"].FirstOrDefault() ??
-                    HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault() ??
-                    HttpContext.Connection.RemoteIpAddress?.ToString();
-
-                TurnstileResponse? turnstileResponse =
-                await turnstileService.ValidateTokenAsync(formModel.CfTurnstileResponse, remoteip);
-
-                if (turnstileResponse is null || turnstileResponse.Success is false)
-                {
-                    ModelState.AddModelError("Turnstile",
-                    turnstileResponse is null ? "response null!" : string.Join(", ", turnstileResponse.ErrorCodes));
-                    return BadRequest(ModelState);
-                }
-            }
-
-            Identity_UserDbModel? user;
+            IdentityUser<Guid>? user;
             if (formModel.UsernameOrEmail.Contains('@'))
             {
                 user = await _userManager.FindByEmailAsync(formModel.UsernameOrEmail);
@@ -111,6 +103,8 @@ public class AuthenticationController : ControllerBase
     }
 
     [HttpPost]
+    [ValidateTurnstile]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> LoginWithGitHub([FromForm] Authentication_LoginWithProvider_FormModel formModel)
     {
         //Url.IsLocalUrl()
@@ -126,6 +120,8 @@ public class AuthenticationController : ControllerBase
     }
 
     [HttpPost]
+    [ValidateTurnstile]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> LoginWithGoogle([FromForm] Authentication_LoginWithProvider_FormModel formModel)
     {
         var properties = new AuthenticationProperties
@@ -145,37 +141,7 @@ public class AuthenticationController : ControllerBase
     [HttpGet, HttpPost, IgnoreAntiforgeryToken]
     public async Task<ActionResult> GitHubLoginCallback()
     {
-        /*if (Request.Query.Keys.Contains("iss"))
-        {
-            var queryDict = HttpUtility.ParseQueryString(Request.QueryString.Value ?? "");
-            queryDict.Remove("iss");
-
-            IEnumerable<KeyValuePair<string,string?>> keyValuePairs = [];
-            foreach(string k in queryDict.Keys)
-            {
-                keyValuePairs = keyValuePairs.Append(new KeyValuePair<string, string?>(k, queryDict[k]));
-            }
-
-            string myUrl = Request.PathBase + Request.Path +
-            QueryString.Create(keyValuePairs);
-
-            Console.WriteLine("\n***** myUrl = " + myUrl);
-
-            return LocalRedirect(myUrl);
-        }*/
-
         var result = await HttpContext.AuthenticateAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme);
-
-        /*Console.WriteLine("\n ***** result.Failure?.Message = "+result.Failure?.Message);
-        Console.WriteLine("\n ***** result.None = "+result.None);
-        Console.WriteLine("\n ***** result.Succeeded = "+result.Succeeded);
-        Console.WriteLine("\n ***** result.Principal?.Identity?.IsAuthenticated = "+result.Principal?.Identity?.IsAuthenticated);
-        Console.WriteLine("\n ***** result.Principal?.GetClaim(ClaimTypes.NameIdentifier) = "+result.Principal?.GetClaim(ClaimTypes.NameIdentifier));
-        Console.WriteLine("\n ***** claims:");
-        foreach (var claim in result.Principal?.Claims ?? [])
-        {
-            Console.WriteLine(claim.Type + " = " + claim.Value);
-        }*/
 
         if (result is not { Succeeded: true, Principal.Identity.IsAuthenticated: true })
         {
@@ -235,19 +201,18 @@ public class AuthenticationController : ControllerBase
             var userByEmail = await _userManager.FindByEmailAsync(userEmail!);
             if (userByEmail is null)
             {
-                //throw new Exception("my exception");
-                var username = result.Principal.GetClaim("login")
-                + "_" + Guid.NewGuid().ToString("N");
-                username = Regex.Replace(username, @"[^a-zA-Z0-9._]", "");
-                //MyRegex().Replace();Doesn't work, I don't know why
-                //Console.WriteLine($"username: {username}");
+                var usernameHint = result.Principal.GetClaim("login");
+                if (usernameHint is not null)
+                {
+                    usernameHint = Regex.Replace(usernameHint, @"[^a-zA-Z0-9._]", "");
+                }
+                string username = _usernameGenerator.GetUniqueInMilliSeconds(usernameHint);
+
                 user = new()
                 {
                     UserName = username,
                     Email = userEmail,
                     EmailConfirmed = emailVerified,
-                    DisplayName = result.Principal.GetClaim("name"),
-                    RemoteImageUrl = result.Principal.GetClaim("avatar_url"),
                 };
                 var userCreationResult = await _userManager.CreateAsync(user);
                 if (!userCreationResult.Succeeded)
@@ -258,6 +223,21 @@ public class AuthenticationController : ControllerBase
                     }
                     return BadRequest(ModelState);
                 }
+
+                if (!user.EmailConfirmed)
+                {
+                    //send email validation link
+                    await SendEmailValidationLink(user);
+                }
+
+                //create user profile document on mongodb
+                var bsonDoc = new BsonDocument
+                {
+                    {"_id", new BsonBinaryData(user.Id, GuidRepresentation.Standard)},
+                    { "remoteAvatarUrl", new BsonString(result.Principal.GetClaim("avatar_url")) },
+                    { "createdAt", new BsonDateTime(DateTime.UtcNow) },
+                };
+                await _userProfileCollection.InsertOneAsync(bsonDoc);
             }
             else
             {
@@ -270,7 +250,7 @@ public class AuthenticationController : ControllerBase
         var exSigninResult = await _signInManager.ExternalLoginSignInAsync(loginProvider, providerKey, true);
         //Console.WriteLine($"***** exSigninResult: {exSigninResult}");
 
-        return Redirect(result.Properties.RedirectUri ?? "/Api/Authorization/Authorize");
+        return Redirect(result.Properties.RedirectUri ?? "/api/identity/Authorization/Authorize");
     }
 
 
@@ -299,7 +279,6 @@ public class AuthenticationController : ControllerBase
         }
 
         string userEmail = result.Principal.GetClaim(ClaimTypes.Email)!;
-        string userDisplayName = userEmail.Substring(0, userEmail.IndexOf('@'));
         string loginProvider = "Google";
         string providerKey = result.Principal.GetClaim(ClaimTypes.NameIdentifier)!;
         UserLoginInfo userLoginInfo = new(loginProvider, providerKey, loginProvider);
@@ -309,18 +288,13 @@ public class AuthenticationController : ControllerBase
             var userByEmail = await _userManager.FindByEmailAsync(userEmail);
             if (userByEmail is null)
             {
-                //throw new Exception("my exception");
-                string username = userDisplayName + "_" + Guid.NewGuid().ToString("N");
-                username = Regex.Replace(username, @"[^a-zA-Z0-9._]", "");
-                //MyRegex().Replace();
-                //Console.WriteLine($"username: {username}");
+                string username = _usernameGenerator.GetUniqueInMilliSeconds();
                 user = new()
                 {
                     UserName = username,
                     Email = userEmail,
-                    EmailConfirmed = bool.Parse(result.Principal.GetClaims("email_verified")[0].ToLower()),
-                    RemoteImageUrl = result.Principal.GetClaim("picture"),
-                    DisplayName = userDisplayName,
+                    // why gmail need to be verified
+                    EmailConfirmed = bool.Parse(result.Principal.GetClaims("email_verified")[0].ToLower())
                 };
                 var userCreationResult = await _userManager.CreateAsync(user);
                 if (!userCreationResult.Succeeded)
@@ -331,6 +305,21 @@ public class AuthenticationController : ControllerBase
                     }
                     return BadRequest(ModelState);
                 }
+
+                if (!user.EmailConfirmed)
+                {
+                    //send email validation link
+                    await SendEmailValidationLink(user);
+                }
+
+                //create user profile document on mongodb
+                var bsonDoc = new BsonDocument
+                {
+                    {"_id", new BsonBinaryData(user.Id, GuidRepresentation.Standard)},
+                    { "remoteAvatarUrl", new BsonString(result.Principal.GetClaim("picture")) },
+                    { "createdAt", new BsonDateTime(DateTime.UtcNow) },
+                };
+                await _userProfileCollection.InsertOneAsync(bsonDoc);
             }
             else
             {
@@ -343,7 +332,32 @@ public class AuthenticationController : ControllerBase
         var exSigninResult = await _signInManager.ExternalLoginSignInAsync(loginProvider, providerKey, true);
         //Console.WriteLine($"exSigninResult: {JsonSerializer.Serialize(exSigninResult)}");
 
-        return Redirect(result.Properties.RedirectUri ?? "/Api/Authorization/Authorize");
+        return Redirect(result.Properties.RedirectUri ?? "/api/identity/Authorization/Authorize");
+    }
+
+
+
+    private async Task SendEmailValidationLink(IdentityUser<Guid> user)
+    {
+        //***** Generate Email Validation Token *****
+        string token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+
+        //***** Sending Email *****
+        string emailMessage = $"<h4>Hi dear {user.UserName}</h4>" +
+        "<p>Please click " +
+        $"<a href='https://localhost:5443/Identity/ConfirmEmail?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(user.Email!)}' " +
+        "target='_blank'>'Here'</a>" +
+        " to confirm your email.</p>";
+
+        EmailModel emailModel = new()
+        {
+            Message = emailMessage,
+            ReceiverEmail = user.Email!,
+            ReceiverName = user.UserName,
+            Subject = "Email Validation"
+        };
+
+        _emailSender.Send(emailModel);
     }
 
 

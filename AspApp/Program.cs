@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using MongoDB.Driver;
 using OpenIddict.Abstractions;
 using OpenIddict.Client;
 using OpenIddict.Client.WebIntegration;
@@ -23,7 +24,6 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
 
-
         //******************* Kestrel *******************
         builder.WebHost.ConfigureKestrel(options =>
         {
@@ -32,25 +32,21 @@ public class Program
         });
 
 
-
         //******************* Identity_DbContext *******************
         builder.Services.AddDbContext<Identity_DbContext>(options =>
         {
-            options.UseNpgsql(builder.Configuration["ConnectionStrings_Postgres:IdentityConnection"]);
-
+            options.UseNpgsql(builder.Configuration["Postgres:ConnectionString:Identity"]);
             options.UseOpenIddict<Guid>();
         });
-
         //******************* DataProtection_DbContext *******************
         builder.Services.AddDbContext<DataProtection_DbContext>(options =>
         {
-            options.UseNpgsql(builder.Configuration["ConnectionStrings_Postgres:DataProtectionConnection"]);
+            options.UseNpgsql(builder.Configuration["Postgres:ConnectionString:DataProtection"]);
         });
 
 
-
         //******************* Identity service *******************
-        builder.Services.AddIdentity<Identity_UserDbModel, Identity_RoleDbModel>(options =>
+        builder.Services.AddIdentity<IdentityUser<Guid>, IdentityRole<Guid>>(options =>
         {
             options.User.AllowedUserNameCharacters =
             "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._";
@@ -60,7 +56,7 @@ public class Program
             options.SignIn.RequireConfirmedEmail = false;
 
             options.Password.RequireDigit = false;
-            options.Password.RequiredLength = 5;
+            options.Password.RequiredLength = 8;
             options.Password.RequireLowercase = false;
             options.Password.RequireUppercase = false;
             options.Password.RequireNonAlphanumeric = false;
@@ -70,22 +66,21 @@ public class Program
         .AddDefaultTokenProviders();
 
 
-
         //******************* identity cookie *******************
         builder.Services.ConfigureApplicationCookie(options =>
         {
             options.Cookie.HttpOnly = true; // prevent from js access
             options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // https only
-            options.Cookie.SameSite = SameSiteMode.None;// no csrf protection to solve strict tracking prevention mechanisms
+            options.Cookie.SameSite = SameSiteMode.Lax;// protect unsafe methods from csrf
+            options.Cookie.Path = "/api/identity/";
 
             //Default for "Remember Me". Without "Remember Me" → Session cookie (expires when browser closes)
-            options.ExpireTimeSpan = TimeSpan.FromDays(14);
-            options.SlidingExpiration = true;
+            options.ExpireTimeSpan = TimeSpan.FromDays(14);//null or don't set for session lifetime
+            options.SlidingExpiration = true;//Reset expiration when user interacts halfway through the lifespan
 
-            //options.LoginPath = "/Account/Login";
+            options.LoginPath = "/Authentication";
             //options.AccessDeniedPath = "/Account/AccessDenied";
         });
-
 
 
         //******************* Data Protection *******************
@@ -95,11 +90,14 @@ public class Program
         .SetApplicationName("SharedIdentityApp"); // Must match across all servers
 
 
-        
+        //******************* SecurityStampValidatorOptions *******************
+        builder.Services.Configure<SecurityStampValidatorOptions>(options =>
+        {
+            options.ValidationInterval = TimeSpan.Zero;
+        });
 
-        
 
-        // OIDC Client encryption
+        /*/ OIDC Client encryption
         using var algorithm = RSA.Create(keySizeInBits: 4096);
 
         var subject = new X500DistinguishedName("CN=OIDC Client Encryption Certificate");
@@ -107,6 +105,12 @@ public class Program
         request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.KeyEncipherment, critical: true));
 
         var clientEncryptionCert = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(2));
+*/
+
+        // **********    CertManager    **********
+        CertManager certManager = new(builder.Environment);
+        builder.Services.AddSingleton<CertManager>(certManager);
+
 
         //******************* OpenIddict *******************
         builder.Services.AddOpenIddict()
@@ -116,18 +120,20 @@ public class Program
             .UseDbContext<Identity_DbContext>()
             .ReplaceDefaultEntities<Guid>();
         })
-        .AddClient(options =>
+        .AddClient(async options =>
         {
             // Note: this sample uses the code flow, but you can enable the other flows if necessary.
             options.AllowAuthorizationCodeFlow();
 
             // Register the signing and encryption credentials used to protect
             // sensitive data like the state tokens produced by OpenIddict.            
-            options.AddEncryptionCertificate(clientEncryptionCert)
+            /*options.AddEncryptionCertificate(clientEncryptionCert)
             .AddSigningCredentials(new SigningCredentials(
                 new ECDsaSecurityKey(ECDsa.Create(ECCurve.NamedCurves.nistP256)),
                 SecurityAlgorithms.EcdsaSha256
-            ));
+            ))*/
+            options.AddEncryptionCertificate(await certManager.GetRsaKeyEncryptionCert())
+            .AddSigningKey(new ECDsaSecurityKey(ECDsa.Create(ECCurve.NamedCurves.nistP256)));
 
             // Register the ASP.NET Core host and configure the ASP.NET Core-specific options.
             options.UseAspNetCore()
@@ -151,13 +157,13 @@ public class Program
             {
                 opts.SetClientId(builder.Configuration["GitHubClientId"]!)
                 .SetClientSecret(builder.Configuration["GitHubClientSecret"]!)
-                .SetRedirectUri("Api/Authentication/GitHubLoginCallback");
+                .SetRedirectUri("api/identity/Authentication/GitHubLoginCallback");
             })
             .AddGoogle(opts =>
             {
                 opts.SetClientId(builder.Configuration["GoogleClientId"]!)
                 .SetClientSecret(builder.Configuration["GoogleClientSecret"]!)
-                .SetRedirectUri("Api/Authentication/GoogleLoginCallback");
+                .SetRedirectUri("api/identity/Authentication/GoogleLoginCallback");
             });
 
             /*options.AddEventHandler<OpenIddictClientEvents.PrepareConfigurationRequestContext>(b =>
@@ -204,17 +210,8 @@ public class Program
 
 
 
-        //******************* SecurityStampValidatorOptions *******************
-        builder.Services.Configure<SecurityStampValidatorOptions>(options =>
-        {
-            options.ValidationInterval = TimeSpan.Zero;
-        });
-
-
-
         //******************* ControllersWithViews *******************
-        builder.Services.AddControllersWithViews();
-
+        builder.Services.AddControllers();
 
 
         //******************* AntiForgery *******************
@@ -225,19 +222,43 @@ public class Program
         });
 
 
+        //**************************** Kafka Producer **************************
+        KafkaProducerService kafkaService = new(builder.Configuration);
+        builder.Services.AddSingleton<KafkaProducerService>(kafkaService);
+
+
+        //**************************** Logger **************************
+        builder.Logging.ClearProviders();
+        builder.Logging.AddConsole(); // Keep Console for local visibility
+        builder.Logging.AddKafka(kafkaService, builder.Configuration);
+
+
+        //**************************** Email Sender **************************
+        builder.Services.AddSingleton<KafkaEmailSender>();
+
 
         //******************* IHttpClientFactory *******************
         builder.Services.AddHttpClient();
 
 
-
-        //**************************** Custom Services **************************
+        //**************************** Turnstile **************************
         builder.Services.AddSingleton<TurnstileService>();
 
 
+        //******************* Username Generator *******************
+        builder.Services.AddSingleton<UsernameGenerator>();
+
+
+        // ************ MongoDb ***********
+        // Register IMongoClient as a Singleton
+        IMongoClient mongoClient = new MongoClient(builder.Configuration["MongoDb:ConnectionString"]);
+        builder.Services.AddSingleton<IMongoClient>(mongoClient);
+        // Register IMongoDatabase directly as a Singleton for quick access
+        IMongoDatabase userDb = mongoClient.GetDatabase(builder.Configuration["MongoDb:UserDbName"]);
+        builder.Services.AddSingleton<IMongoDatabase>(userDb);
+
 
         var app = builder.Build();
-
 
 
         app.UseForwardedHeaders(new ForwardedHeadersOptions
@@ -245,7 +266,6 @@ public class Program
             ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
             KnownIPNetworks = { new System.Net.IPNetwork(IPAddress.Parse("172.18.0.0"), 16) }
         });
-
 
 
         app.UseRouting();
@@ -257,7 +277,6 @@ public class Program
         app.MapDefaultControllerRoute();
 
 
-
         //**************************** Seed Data **************************
         await using (var scope = app.Services.CreateAsyncScope())
         {
@@ -267,17 +286,15 @@ public class Program
             var identityDb = scope.ServiceProvider.GetRequiredService<Identity_DbContext>();
             await identityDb.Database.MigrateAsync();
 
-            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<Identity_UserDbModel>>();
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser<Guid>>>();
             //***** Create "admin" Identity *****
-            Identity_UserDbModel? admin = await userManager.FindByNameAsync("admin");
+            IdentityUser<Guid>? admin = await userManager.FindByNameAsync("admin");
             if (admin == null)
             {
                 string adminPassword = builder.Configuration["Identity:AdminPassword"]!;
-                admin = new Identity_UserDbModel
+                admin = new IdentityUser<Guid>
                 {
                     UserName = "admin",
-                    DisplayName = "Admin",
-                    Description = "This user account belongs to the admin of the app.",
                     Email = "admin@HoLibz.com",
                     EmailConfirmed = true,
                 };
@@ -287,22 +304,23 @@ public class Program
                 {
                     foreach (var error in result.Errors)
                     {
-                        Console.WriteLine(error.Description);
+                        //Console.WriteLine(error.Description);
+                        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+                        logger.LogWarning(error.Description);
                     }
                     return;
                 }
             }
 
-            var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<Identity_RoleDbModel>>();
+            var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
             //***** Seed Roles *****
             if (await roleManager.FindByNameAsync("Identity_Admins") == null)
             {
-                await roleManager.CreateAsync(new Identity_RoleDbModel("Identity_Admins"));
+                await roleManager.CreateAsync(new IdentityRole<Guid>("Identity_Admins"));
                 await userManager.AddToRoleAsync(admin, "Identity_Admins");
             }
 
         }
-
 
 
         //******************* app.Run ******************

@@ -5,18 +5,42 @@ namespace AspApp.Helpers;
 
 public class TurnstileService
 {
-    readonly IHttpClientFactory _httpClientFactory;
-    readonly string _secretKey;
-    const string SiteverifyUrl = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly string _secretKey;
+    private const string SiteverifyUrl = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+    private readonly bool _turnstileEnabled;
+
 
     public TurnstileService(IHttpClientFactory httpClientFactory, IConfiguration configuration)
     {
         _httpClientFactory = httpClientFactory;
         _secretKey = configuration["TurnstileSecretKey"]!;
+        _turnstileEnabled = configuration.GetValue<bool>("TurnsTileEnable", false);
     }
 
-    public async Task<TurnstileResponse?> ValidateTokenAsync(string token, string? remoteip = null)
+    public async Task<TurnstileResponse?> ValidateTokenAsync(HttpContext httpContext, string? token = null)
     {
+        if (!_turnstileEnabled)
+        {
+            return new TurnstileResponse()
+            {
+                Success = true,
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return new TurnstileResponse()
+            {
+                Success = false,
+                ErrorCodes = new[] { "token-null" }
+            };
+        }
+
+        var remoteip = httpContext.Request.Headers["CF-Connecting-IP"].FirstOrDefault() ??
+        httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault() ??
+        httpContext.Connection.RemoteIpAddress?.ToString();
+
         var parameters = new Dictionary<string, string>
         {
             { "secret", _secretKey },
@@ -28,27 +52,22 @@ public class TurnstileService
             parameters.Add("remoteip", remoteip);
         }
 
-        //var postContent = new FormUrlEncodedContent(parameters);
-        var formData = new
+        var postContent = new FormUrlEncodedContent(parameters);
+        /*var formData = new
         {
             secret = _secretKey,
             response = token
-        };
+        };*/
 
         try
         {
             var _httpClient = _httpClientFactory.CreateClient();
-            //var response = await _httpClient.PostAsync(SiteverifyUrl, postContent);
-            var response = await _httpClient.PostAsJsonAsync(SiteverifyUrl, formData);
+            var response = await _httpClient.PostAsync(SiteverifyUrl, postContent);
+            //var response = await _httpClient.PostAsJsonAsync(SiteverifyUrl, formData);
             var stringContent = await response.Content.ReadAsStringAsync();
-
-            //Console.WriteLine(stringContent);
 
             TurnstileResponse? turnstileResponse =
             JsonSerializer.Deserialize<TurnstileResponse>(stringContent);
-
-            //Console.WriteLine("\n***** turnstileResponse?.Success: " + turnstileResponse?.Success);
-            //Console.WriteLine("\n***** turnstileResponse?.ErrorCodes.Length: " + turnstileResponse?.ErrorCodes.Length);
 
             return turnstileResponse;
         }
