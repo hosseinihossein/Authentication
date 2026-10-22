@@ -1,19 +1,15 @@
 using System.Net;
 using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 using AspApp.Helpers;
 using AspApp.Models;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using MongoDB.Bson;
 using MongoDB.Driver;
-using OpenIddict.Abstractions;
 using OpenIddict.Client;
-using OpenIddict.Client.WebIntegration;
 
 namespace AspApp;
 
@@ -36,7 +32,7 @@ public class Program
         builder.Services.AddDbContext<Identity_DbContext>(options =>
         {
             options.UseNpgsql(builder.Configuration["Postgres:ConnectionString:Identity"]);
-            options.UseOpenIddict<Guid>();
+            //options.UseOpenIddict<Guid>();
         });
         //******************* DataProtection_DbContext *******************
         builder.Services.AddDbContext<DataProtection_DbContext>(options =>
@@ -114,12 +110,12 @@ public class Program
 
         //******************* OpenIddict *******************
         builder.Services.AddOpenIddict()
-        .AddCore(options =>
+        /*.AddCore(options =>
         {
             options.UseEntityFrameworkCore()
             .UseDbContext<Identity_DbContext>()
             .ReplaceDefaultEntities<Guid>();
-        })
+        })*/
         .AddClient(async options =>
         {
             // Note: this sample uses the code flow, but you can enable the other flows if necessary.
@@ -210,7 +206,7 @@ public class Program
 
 
 
-        //******************* ControllersWithViews *******************
+        //******************* Controllers *******************
         builder.Services.AddControllers();
 
 
@@ -310,6 +306,15 @@ public class Program
                     }
                     return;
                 }
+
+                //create user profile document on mongodb
+                var bsonDoc = new BsonDocument
+                {
+                    {"_id", new BsonBinaryData(admin.Id, GuidRepresentation.Standard)},
+                    { "createdAt", new BsonDateTime(DateTime.UtcNow) },
+                };
+                var userProfileCollection = userDb.GetCollection<BsonDocument>(app.Configuration["MongoDB:ProfileCollectionName"] ?? "Profile");
+                await userProfileCollection.InsertOneAsync(bsonDoc);
             }
 
             var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
